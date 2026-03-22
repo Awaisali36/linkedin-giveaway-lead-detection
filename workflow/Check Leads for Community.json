@@ -1,0 +1,604 @@
+{
+  "name": "Check Leads for Community",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1248,
+        400
+      ],
+      "id": "3ac0ca67-dce2-4782-8eed-b621f3ac4cd5",
+      "name": "For Each DM"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -576,
+        272
+      ],
+      "id": "96823e84-8d24-4cca-9a1a-db8ef53667d8",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "V0OoELb6G7wEUy2t",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heyreach.io/api/public/inbox/SendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "qqKE+kx3exYL8X3EAIPbUujFfRR1XGFXJVI504jy4SU="
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{ $('Reply to Conversation').item.json.output.reply }}"
+            },
+            {
+              "name": "conversationId",
+              "value": "={{ $('Adjust the conversation').item.json.conversationId }}"
+            },
+            {
+              "name": "linkedInAccountId",
+              "value": "144584"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        432,
+        224
+      ],
+      "id": "82fda0cc-fb4d-4a72-b31d-d557ffbd0eb1",
+      "name": "Send Message",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.wait_seconds }}",
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        480
+      ],
+      "id": "2aacd10a-d556-46fe-9ce0-603a8f8b49ba",
+      "name": "Wait",
+      "webhookId": "bb0e3203-c0b5-498d-91f9-a84ae6afc311"
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        432,
+        48
+      ],
+      "id": "b3ba1dce-c14d-423f-85a8-037e8a4da2a0",
+      "name": "Wait1",
+      "webhookId": "3d785412-244c-4d40-8f2e-3419257c4a29"
+    },
+    {
+      "parameters": {
+        "jsCode": "const min = 10;\nconst max = 20;\n\n// Random integer between 10 and 20\nconst randomDelay = Math.floor(Math.random() * (max - min + 1)) + min;\n\nreturn [\n  {\n    json: {\n      wait_seconds: randomDelay\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        240
+      ],
+      "id": "2b9195c7-c3ec-44e0-b8fc-5e0c3580e13d",
+      "name": "Random time"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1920,
+        400
+      ],
+      "id": "f7c7db9e-ace1-466d-9d39-4e967f702075",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heyreach.io/api/public/inbox/GetConversationsV2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "qqKE+kx3exYL8X3EAIPbUujFfRR1XGFXJVI504jy4SU="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"filters\": {\n    \"linkedInAccountIds\": [\n      144584\n    ],\n    \"seen\": false\n  },\n  \"offset\": 0,\n  \"limit\": 50\n}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "offset",
+                    "value": "={{$pageCount}}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.items.length === 0 }}"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1696,
+        400
+      ],
+      "id": "25ced833-ac02-4f84-af92-b4796df1e86f",
+      "name": "Only Unread Messages"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d93eed27-cdf2-4531-8a5b-fd1a18683ae4",
+              "name": "messageThreadURL",
+              "value": "={{ 'https://www.linkedin.com/messaging/thread/' + $json.id + '/' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1024,
+        48
+      ],
+      "id": "4972bf56-e457-4f82-8eae-fb21eb3b3d22",
+      "name": "Set MessageLink"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the conversation JSON from the node \"For each DM1\"\nconst conversation = $('For Each DM').item.json;\n\n// Safety: ensure messages exist\nconst messages = Array.isArray(conversation.messages) ? conversation.messages : [];\n\n// (Optional) ensure correct order\nmessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));\n\n// Map messages into a readable transcript\nconst transcript = messages\n  .map(msg => {\n    const sender = msg.sender === \"ME\" ? \"Me\" : \"Lead\";\n    return `${sender}: ${msg.body}`;\n  })\n  .join(\"\\n\\n\");\n\nreturn [\n  {\n    json: {\n      conversationId: conversation.id, // or conversation.conversationId if your payload uses that\n      linkedInAccountId: conversation.linkedInAccountId,\n      leadProfileUrl: conversation.correspondentProfile?.profileUrl,\n      messageURL:$input.first().json.messageThreadURL,\n      transcript\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        48
+      ],
+      "id": "d01cfd52-808e-41b8-9a79-d7fe2f8fdcb3",
+      "name": "Adjust the conversation"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this unread LinkedIn DM conversation.\n\nImportant: The lead may have sent multiple consecutive messages.\nUse the lead’s most recent reply segment (last 1–6 consecutive lead messages) to infer intent.\n\nConversation:\n{{ $json.transcript }}\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an AI assistant handling unread LinkedIn DM replies.\n\nGoal\n\nIdentify whether the lead accepted (explicitly or implicitly) our invitation to join our free community, so we can add them to a HeyReach list.\n\nKey idea\n\nDo not evaluate only the last single message.\nInstead, evaluate the lead’s most recent reply segment: the last 1–6 consecutive messages sent by the lead at the end of the transcript (i.e., their most recent uninterrupted messages).\n\nTask\n\nGiven the full conversation history, output:\n\ncommunity_invite_present: Did we (earlier) invite them to join a community?\n\nlead_reply_segment: Quote (verbatim) the lead’s most recent reply segment (1–6 messages).\n\ncommunity_accept_intent: Classify the intent of the lead’s reply segment:\n\n\"accept\" (they want to join / receive the link)\n\n\"ask_clarify\" (they’re asking what it is, but not accepting yet)\n\n\"decline\" (not interested / no)\n\n\"irrelevant\" (not about community)\n\n\"opt_out\" (stop/don’t contact)\n\nadd_to_list: true only when accept intent is present and community invite exists.\n\nshould_reply: whether we should reply.\n\nreply: short message if replying.\n\nDetecting community invite\n\nSet community_invite_present = true if our earlier messages include meaning like:\n\n“free community”\n\n“we’re building a community”\n\n“want to join?”\n\n“should I share the link?”\n\n“I can add you”\n\n“would you like to be included?”\n\nHow to classify acceptance intent (be practical)\n\nSet community_accept_intent = \"accept\" if the lead reply segment includes any of:\n\nDirect acceptance\n\nyes / yeah / sure / ok sounds good\n\nI’d like to / I want to join / count me in\n\nadd me / include me\n\nImplicit acceptance\n\nI’m interested\n\nthat would be great\n\nplease share\n\nsend details / send link\n\nhow do I join? / where is it? / can you share the link?\n\nwhat’s the link? (this implies acceptance)\n\nAccept + small question still counts as accept\n\n“Yes, what’s it about?”\n\n“Sure—how does it work?”\nIf they accept and ask a question, still classify as \"accept\".\n\nSet community_accept_intent = \"ask_clarify\" if they only ask about it without any joining intent:\n\n“What kind of community is it?”\n\n“What’s it about?”\n\n“Who is it for?”\n\n“Is it paid?”\n\nSet community_accept_intent = \"decline\" for:\n\nno / not interested / maybe later / not now\n\nSet community_accept_intent = \"opt_out\" for:\n\nstop / unsubscribe / don’t message / remove me\n\nSet community_accept_intent = \"irrelevant\" if it’s unrelated.\n\nDecision rules (in order)\n\nIf community_accept_intent = \"opt_out\"\n→ add_to_list = false, should_reply = false, reply = null\n\nIf community_invite_present = false\n→ add_to_list = false\n→ should_reply = false (unless they asked a direct question unrelated to community; otherwise ignore)\n\nIf community_invite_present = true AND community_accept_intent = \"accept\"\n→ add_to_list = true\n→ should_reply = true (send a short confirmation)\n\nIf community_invite_present = true AND community_accept_intent = \"ask_clarify\"\n→ add_to_list = false\n→ should_reply = true (answer briefly, then ask 1 soft confirm question)\n\nOtherwise\n→ add_to_list = false, should_reply = false, reply = null\n\nReply style rules\n\n1–2 short lines (max 3)\n\nFriendly, simple, non-salesy\n\nNo call booking, no pitching\n\nAsk at most one question only if needed\n\nIf the link is not available in the transcript, do NOT invent it. Say you’ll share it when it’s live."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -576,
+        48
+      ],
+      "id": "055cbe04-c290-4b90-8bb3-21b857441106",
+      "name": "Reply to Conversation",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9462a95a-7282-4a84-b673-75cd5bb7de62",
+              "leftValue": "={{ $json.add_to_list }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -16,
+        32
+      ],
+      "id": "fa987a7d-3f85-43ea-9b40-bfe893bdf651",
+      "name": "Lead want to Join Community"
+    },
+    {
+      "parameters": {
+        "resource": "list",
+        "operation": "addLeadsToList",
+        "listId": 491927,
+        "wrapperLeads": {
+          "leads": [
+            {
+              "firstName": "={{ $('For Each DM').item.json.correspondentProfile.firstName }}",
+              "lastName": "={{ $('For Each DM').item.json.correspondentProfile.lastName }}",
+              "profileUrl": "={{ $('For Each DM').item.json.correspondentProfile.profileUrl }}"
+            }
+          ]
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-heyreach.heyReach",
+      "typeVersion": 1,
+      "position": [
+        208,
+        -16
+      ],
+      "id": "96b23020-b261-430b-9a6e-a1701002d4cd",
+      "name": "Add leads to a list",
+      "credentials": {
+        "heyReachApi": {
+          "id": "gqtc6DiuaC0tqgCl",
+          "name": "HeyReach account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        432,
+        448
+      ],
+      "id": "1ec8f835-ea62-40cc-b73a-39705ea40bc0",
+      "name": "Wait2",
+      "webhookId": "88dd518c-018b-4106-bafd-cabde809f3dd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d4a11cd7-3fe7-4dec-b447-4cd76f354574",
+              "leftValue": "={{ $json.should_reply }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        224
+      ],
+      "id": "8626e470-74f8-4b95-af8e-5f3db5795286",
+      "name": "Reply to lead"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code node\nconst raw = $json.output ?? $json;  // sometimes you'll have {output:\"...\"} or already an object\nlet obj;\n\n// 1) Parse JSON safely\ntry {\n  obj = typeof raw === 'string' ? JSON.parse(raw) : raw;\n} catch (e) {\n  // If parsing fails, output a safe default\n  return [{\n    json: {\n      community_invite_present: false,\n      lead_reply_segment: [],\n      community_accept_intent: \"irrelevant\",\n      add_to_list: false,\n      should_reply: false,\n      reply: null,\n      _parse_error: true,\n      _raw: raw\n    }\n  }];\n}\n\n// 2) Normalize lead_reply_segment to array of strings\nlet seg = obj.lead_reply_segment;\n\nif (Array.isArray(seg)) {\n  seg = seg.map(s => String(s)).filter(s => s.trim().length > 0);\n} else if (typeof seg === 'string') {\n  // Split into lines, keep meaningful lines, cap 6\n  seg = seg\n    .split(/\\n+/)\n    .map(s => s.trim())\n    .filter(Boolean)\n    .slice(0, 6);\n} else if (seg == null) {\n  seg = [];\n} else {\n  seg = [String(seg)];\n}\n\n// 3) Enforce enum for community_accept_intent\nconst allowed = new Set([\"accept\", \"ask_clarify\", \"decline\", \"irrelevant\", \"opt_out\"]);\nlet intent = String(obj.community_accept_intent ?? \"irrelevant\").trim();\nif (!allowed.has(intent)) intent = \"irrelevant\";\n\n// 4) Coerce booleans\nconst toBool = (v) => v === true || v === \"true\" || v === 1 || v === \"1\";\n\nconst community_invite_present = toBool(obj.community_invite_present);\nconst should_reply = toBool(obj.should_reply);\n\n// add_to_list should only be true if invite present AND intent accept\nlet add_to_list = toBool(obj.add_to_list);\nif (!(community_invite_present && intent === \"accept\")) add_to_list = false;\n\n// 5) reply must be null if should_reply is false\nlet reply = obj.reply;\nif (!should_reply) reply = null;\nif (should_reply && (reply == null || String(reply).trim() === \"\")) {\n  // if they said reply is needed but empty, provide a minimal safe default\n  reply = \"Sounds good — I’ll add you 🙌\";\n}\n\n// 6) Return normalized object\nreturn [{\n  json: {\n    community_invite_present,\n    lead_reply_segment: seg,\n    community_accept_intent: intent,\n    add_to_list,\n    should_reply,\n    reply\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        48
+      ],
+      "id": "8f7cdb7d-a38d-4a87-83ff-b6b1dbf70c48",
+      "name": "Structuring + Normalizing"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1456,
+        400
+      ],
+      "id": "a42a0a12-b01e-4e83-87ea-15fd73b94c93",
+      "name": "Split Out2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "For Each DM": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Set MessageLink",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Reply to Conversation",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Message": {
+      "main": [
+        [
+          {
+            "node": "Random time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Random time": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Only Unread Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only Unread Messages": {
+      "main": [
+        [
+          {
+            "node": "Split Out2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set MessageLink": {
+      "main": [
+        [
+          {
+            "node": "Adjust the conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjust the conversation": {
+      "main": [
+        [
+          {
+            "node": "Reply to Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to Conversation": {
+      "main": [
+        [
+          {
+            "node": "Structuring + Normalizing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead want to Join Community": {
+      "main": [
+        [
+          {
+            "node": "Add leads to a list",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply to lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add leads to a list": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "Set MessageLink",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to lead": {
+      "main": [
+        [
+          {
+            "node": "Send Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structuring + Normalizing": {
+      "main": [
+        [
+          {
+            "node": "Lead want to Join Community",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out2": {
+      "main": [
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "edb11659-5afb-4b2b-a694-ac4e0f6ecda3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ecefede2b43cbe1a00e971b8041e14b8e420843726cd23fe9c92442a728c3cde"
+  },
+  "id": "H4yt5b630ipmkjul",
+  "tags": []
+}
