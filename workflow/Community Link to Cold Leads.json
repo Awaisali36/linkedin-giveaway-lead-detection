@@ -1,0 +1,511 @@
+{
+  "name": "Community Link to Cold Leads",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1296,
+        240
+      ],
+      "id": "2dd6513d-670c-45fd-bbdb-c1e9197c1496",
+      "name": "For Each DM"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"cold_lead\": true,\n  \"no_business\": true,\n  \"learning_intent\": true,\n  \"send_message\": true,\n  \"reply\": \"...\"\n}\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -384,
+        272
+      ],
+      "id": "37cc6096-a62b-4b7f-a7ab-ddf73575c8a4",
+      "name": "Structured Output Parser3"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -688,
+        272
+      ],
+      "id": "ca25118b-b517-49a1-a153-c697b432c946",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "V0OoELb6G7wEUy2t",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heyreach.io/api/public/inbox/SendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "qqKE+kx3exYL8X3EAIPbUujFfRR1XGFXJVI504jy4SU="
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{ $json.output.reply }}"
+            },
+            {
+              "name": "conversationId",
+              "value": "={{ $('Adjust the conversation').item.json.conversationId }}"
+            },
+            {
+              "name": "linkedInAccountId",
+              "value": "144584"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        16,
+        -16
+      ],
+      "id": "d65adf6f-068e-4d50-acda-5147bace8960",
+      "name": "Send Message"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.wait_seconds }}",
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "id": "047302db-9804-4292-83c3-28f21c415512",
+      "name": "Wait",
+      "webhookId": "bb0e3203-c0b5-498d-91f9-a84ae6afc311"
+    },
+    {
+      "parameters": {
+        "jsCode": "const min = 10;\nconst max = 20;\n\n// Random integer between 10 and 20\nconst randomDelay = Math.floor(Math.random() * (max - min + 1)) + min;\n\nreturn [\n  {\n    json: {\n      wait_seconds: randomDelay\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        -16
+      ],
+      "id": "69f7daa4-acc4-416e-b0c3-1ab7c4d05095",
+      "name": "Random time"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2336,
+        240
+      ],
+      "id": "ee0e105a-106c-49d7-a39a-48292e76fb8f",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d93eed27-cdf2-4531-8a5b-fd1a18683ae4",
+              "name": "messageThreadURL",
+              "value": "={{ 'https://www.linkedin.com/messaging/thread/' + $json.id + '/' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1072,
+        32
+      ],
+      "id": "e2fd0ba2-dc2b-40ed-a2e1-0a44b03438bb",
+      "name": "Set MessageLink"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the conversation JSON from the node \"For each DM1\"\nconst conversation = $('For Each DM').item.json;\n\n// Safety: ensure messages exist\nconst messages = Array.isArray(conversation.messages) ? conversation.messages : [];\n\n// (Optional) ensure correct order\nmessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));\n\n// Map messages into a readable transcript\nconst transcript = messages\n  .map(msg => {\n    const sender = msg.sender === \"ME\" ? \"Me\" : \"Lead\";\n    return `${sender}: ${msg.body}`;\n  })\n  .join(\"\\n\\n\");\n\nreturn [\n  {\n    json: {\n      conversationId: conversation.id, // or conversation.conversationId if your payload uses that\n      linkedInAccountId: conversation.linkedInAccountId,\n      leadProfileUrl: conversation.correspondentProfile?.profileUrl,\n      messageURL:$input.first().json.messageThreadURL,\n      transcript\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        32
+      ],
+      "id": "99912226-851c-487c-a9d9-e3bc1c35f909",
+      "name": "Adjust the conversation"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze the following LinkedIn DM conversation.\n\nDetermine whether the lead is cold, not running a business, or learning-focused.\nIf so, generate a short community invite message.\n\nConversation:\n{{ $json.transcript }}\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=Role\nYou are an AI assistant analyzing read LinkedIn DM conversations.\n\nYour job is NOT to sell and NOT to qualify hot leads.\n\nYour only goal is to decide whether we should send a soft, friendly community invite to the lead.\n\nTask\n\nGiven the full conversation history, determine:\n\nIs the lead cold?\n\nHas the lead explicitly or implicitly said they are NOT running a business?\n\nHas the lead shown learning-only or curiosity-based intent (e.g. learning automations, AI, systems)?\n\nShould we send a community invite message?\n\nIf yes, generate the exact short reply to send.\n\nKey Definitions\n\nCold Lead\nA lead is considered cold if:\n\nThey are not asking about services, implementation, pricing, or next steps\n\nThey are not running a business or solving an active business problem\n\nTheir intent is learning, curiosity, self-education, or exploration only\n\nThey have not requested a call, demo, or help setting something up\n\nNo Business Signal\nTreat the lead as NOT running a business if they say or imply:\n\n“I’m just learning”\n\n“I’m learning by myself”\n\n“I don’t run a business”\n\n“I’m not a founder”\n\n“I’m just exploring”\n\n“I’m a student / employee”\n\n“I want to learn automations / AI”\n\nIf unclear, assume they do NOT run a business.\n\nHard Rules\n\nDo NOT pitch services\n\nDo NOT ask for a call\n\nDo NOT escalate\n\nDo NOT sound salesy\n\nDo NOT send anything if:\n\nThe lead asked to stop\n\nThe lead clearly rejected earlier messages\n\nThe community or a similar link was already sent\n\nDecision Rules (in order)\n\nIf the lead opted out or asked not to be contacted\n→ send_message = false\n\nIf the lead is clearly running a business or asking about services\n→ send_message = false\n\nIf the lead is cold, learning-focused, and not running a business\n→ send_message = true\n\nOtherwise\n→ send_message = false\n\nReply Style (ONLY if sending)\n\n1–3 short lines\n\nFriendly, helpful, low-pressure\n\nCommunity-focused\n\nNo urgency\n\nAsk at most one soft question"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -624,
+        32
+      ],
+      "id": "7d9cad39-9e50-438b-8dbd-4691bd953bfc",
+      "name": "Reply to Conversation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9462a95a-7282-4a84-b673-75cd5bb7de62",
+              "leftValue": "={{ $json.output.cold_lead }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -272,
+        32
+      ],
+      "id": "7aed6110-95a5-4f15-b68c-1ce01528729a",
+      "name": "Lead is Cold"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.wait_seconds }}",
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        224
+      ],
+      "id": "e953b171-bf4c-4525-b213-576e27dff6b7",
+      "name": "Wait1",
+      "webhookId": "bb0e3203-c0b5-498d-91f9-a84ae6afc311"
+    },
+    {
+      "parameters": {
+        "jsCode": "const min = 10;\nconst max = 20;\n\n// Random integer between 10 and 20\nconst randomDelay = Math.floor(Math.random() * (max - min + 1)) + min;\n\nreturn [\n  {\n    json: {\n      wait_seconds: randomDelay\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        224
+      ],
+      "id": "202ea9ea-5c2f-4719-a9d2-3304d4df7858",
+      "name": "Random time1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heyreach.io/api/public/inbox/GetConversationsV2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "qqKE+kx3exYL8X3EAIPbUujFfRR1XGFXJVI504jy4SU="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"filters\": {\n    \"linkedInAccountIds\": [\n      144584\n    ],\n    \"seen\": true\n  },\n  \"offset\": 0,\n  \"limit\": 100\n}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "offset",
+                    "value": "={{ $pageCount }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.items.length === 0 }}",
+              "requestInterval": "=0"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2048,
+        240
+      ],
+      "id": "2b545bd6-583c-4344-a6ce-7b9e793f6bcd",
+      "name": "Only Read Messages"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1760,
+        240
+      ],
+      "id": "57abcb5c-57ad-4e07-b1c0-ced0099ff001",
+      "name": "Split Out2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "For Each DM": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Set MessageLink",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser3": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Reply to Conversation",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Reply to Conversation",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Message": {
+      "main": [
+        [
+          {
+            "node": "Random time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Random time": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Only Read Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set MessageLink": {
+      "main": [
+        [
+          {
+            "node": "Adjust the conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjust the conversation": {
+      "main": [
+        [
+          {
+            "node": "Reply to Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to Conversation": {
+      "main": [
+        [
+          {
+            "node": "Lead is Cold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead is Cold": {
+      "main": [
+        [
+          {
+            "node": "Send Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Random time1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Random time1": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only Read Messages": {
+      "main": [
+        [
+          {
+            "node": "Split Out2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out2": {
+      "main": [
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "a4a5f704-f3f0-4291-8813-c3b12ff89210",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ecefede2b43cbe1a00e971b8041e14b8e420843726cd23fe9c92442a728c3cde"
+  },
+  "id": "mfR0JlsVAAT83qoy",
+  "tags": []
+}
