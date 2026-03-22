@@ -1,0 +1,927 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -4944,
+        16
+      ],
+      "id": "d9a48207-7a4b-4ab4-a703-0ac1972b4b56",
+      "name": "For Each DM"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"booking_link_sent\": true,\n  \"booking_provider\": \"calendly\",\n  \"booking_links\": [\"https://calendly.com/...\"],\n  \"evidence_messages\": [\"<verbatim message(s) from us containing the link>\"]\n}\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -3568,
+        -96
+      ],
+      "id": "02bc2e83-1225-4551-875a-af47da837a24",
+      "name": "Structured Output Parser3"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -3840,
+        -96
+      ],
+      "id": "30ff9463-29ea-45e2-b11e-c6a421bc25ad",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "V0OoELb6G7wEUy2t",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2896,
+        -224
+      ],
+      "id": "03393c28-e8dd-4eb3-908f-4abb5f173750",
+      "name": "Wait",
+      "webhookId": "bb0e3203-c0b5-498d-91f9-a84ae6afc311"
+    },
+    {
+      "parameters": {
+        "amount": 10,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1824,
+        -192
+      ],
+      "id": "190daa4e-e066-4d1b-b1cc-d15e0c5e6877",
+      "name": "Wait1",
+      "webhookId": "3d785412-244c-4d40-8f2e-3419257c4a29"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d93eed27-cdf2-4531-8a5b-fd1a18683ae4",
+              "name": "messageThreadURL",
+              "value": "={{ 'https://www.linkedin.com/messaging/thread/' + $('For Each DM').item.json.id + '/' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4144,
+        -320
+      ],
+      "id": "a994bba3-a4f2-46cc-874e-1cd2a9dd48d3",
+      "name": "Set MessageLink"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the conversation JSON from the node \"For each DM1\"\nconst conversation = $('For Each DM').item.json;\n\n// Safety: ensure messages exist\nconst messages = Array.isArray(conversation.messages) ? conversation.messages : [];\n\n// (Optional) ensure correct order\nmessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));\n\n// Map messages into a readable transcript\nconst transcript = messages\n  .map(msg => {\n    const sender = msg.sender === \"ME\" ? \"Me\" : \"Lead\";\n    return `${sender}: ${msg.body}`;\n  })\n  .join(\"\\n\\n\");\n\nreturn [\n  {\n    json: {\n      conversationId: conversation.id, // or conversation.conversationId if your payload uses that\n      linkedInAccountId: conversation.linkedInAccountId,\n      leadProfileUrl: conversation.correspondentProfile?.profileUrl,\n      messageURL:$input.first().json.messageThreadURL,\n      transcript\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3920,
+        -320
+      ],
+      "id": "8c5906fe-39e2-4419-9aec-12665837bf37",
+      "name": "Adjust the conversation"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze the following LinkedIn DM conversation and determine whether we have already sent a Calendly (or booking) link previously.\n\nConversation:\n{{ $json.transcript }}\n",
+        "hasOutputParser": true,
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "You are an AI assistant analyzing LinkedIn DM conversation transcripts.\n\nGoal\n\nDetermine whether we have already sent a booking link to the lead in this conversation.\n\nThe booking link is typically a Calendly link, but it may also be a scheduling link from similar domains.\n\nTask\n\nGiven the full conversation transcript:\n\nDetect if any message from us (not the lead) contains a booking link.\n\nIf found, extract:\n\nthe booking URL(s)\n\nthe message text containing it (verbatim)\n\nIf no link is found, return false.\n\nWhat counts as a booking link\n\nCount as booking_link_sent = true if you find any of the following in our messages:\n\nCalendly domains\n\ncalendly.com\n\ncalendly.io (rare, but include)\n\nCommon scheduling domains (also count)\n\ncal.com\n\nyoucanbook.me\n\nacuityscheduling.com\n\nhubspot.com/meetings\n\nmeetings.hubspot.com\n\nsavvycal.com\n\ntidycal.com\n\ndoodle.com (only if it’s clearly a booking link)\n\ngoogle.com/calendar/appointments\n\ndocs.google.com/forms only if clearly used as booking (otherwise ignore)\n\nAlso treat shortened links as booking links ONLY if the surrounding text clearly indicates booking, e.g.:\n\n“book a call here”\n\n“schedule time”\n\n“grab a slot”\n\n“here’s my calendar”\n\nSender rule (important)\n\nOnly count links as “sent” if they appear in messages written by us.\nIf the lead sends a Calendly link, that does not count as booking_link_sent.\n\nExtra rules\n\nDo not invent or guess links.\n\nIf multiple booking links exist, include them all.\n\nIf a link is partially redacted in the transcript, include it exactly as shown."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -3696,
+        -320
+      ],
+      "id": "10fc6726-efeb-4353-b6fb-bf7eac1e76e0",
+      "name": "Check for the Booking Link in the Conversation",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9462a95a-7282-4a84-b673-75cd5bb7de62",
+              "leftValue": "={{ $json.output.booking_link_sent }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3344,
+        -320
+      ],
+      "id": "416f6b67-c6a6-4679-87a9-d3ff94177264",
+      "name": "if Booking Link Sent"
+    },
+    {
+      "parameters": {
+        "resource": "list",
+        "operation": "addLeadsToList",
+        "listId": 491998,
+        "wrapperLeads": {
+          "leads": [
+            {
+              "firstName": "={{ $('For Each DM').item.json.correspondentProfile.firstName }}",
+              "lastName": "={{ $('For Each DM').item.json.correspondentProfile.lastName }}",
+              "profileUrl": "={{ $('For Each DM').item.json.correspondentProfile.profileUrl }}"
+            }
+          ]
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-heyreach.heyReach",
+      "typeVersion": 1,
+      "position": [
+        -2224,
+        -512
+      ],
+      "id": "d5e97f70-1966-4da2-99f7-ae0a5b39c7c1",
+      "name": "Add leads to a Booking Link Sent List",
+      "credentials": {
+        "heyReachApi": {
+          "id": "gqtc6DiuaC0tqgCl",
+          "name": "HeyReach account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "list",
+        "operation": "addLeadsToList",
+        "listId": 491999,
+        "wrapperLeads": {
+          "leads": [
+            {
+              "firstName": "={{ $('For Each DM').item.json.correspondentProfile.firstName }}",
+              "lastName": "={{ $('For Each DM').item.json.correspondentProfile.lastName }}",
+              "profileUrl": "={{ $('For Each DM').item.json.correspondentProfile.profileUrl }}"
+            }
+          ]
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-heyreach.heyReach",
+      "typeVersion": 1,
+      "position": [
+        -3120,
+        -224
+      ],
+      "id": "84747a01-2fb3-4a6b-bbe0-9bbd65820c84",
+      "name": "Add leads to a Booking Link Not Sent List",
+      "credentials": {
+        "heyReachApi": {
+          "id": "gqtc6DiuaC0tqgCl",
+          "name": "HeyReach account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heyreach.io/api/public/inbox/GetConversationsV2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "qqKE+kx3exYL8X3EAIPbUujFfRR1XGFXJVI504jy4SU="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"filters\": {\n    \"linkedInAccountIds\": [\n      144584\n    ]\n  },\n  \"offset\": 0,\n  \"limit\": 100\n}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 50
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "offset",
+                    "value": "={{ $pageCount * 100 }}\n"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.items.length === 0 }}"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -5392,
+        16
+      ],
+      "id": "19af5af6-22dc-4fcb-8b7c-f3ea6d655a3a",
+      "name": "Get All Conversations"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -5168,
+        16
+      ],
+      "id": "03001421-6048-44e3-807b-a385fb7098b6",
+      "name": "Split Out2"
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/opportunities/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "location_id",
+              "value": "cV8b3lDqLj32BDyqJGeO"
+            },
+            {
+              "name": "pipeline_id",
+              "value": "a0opuI56Ni97uN1wUr7Y"
+            },
+            {
+              "name": "pipeline_stage_id",
+              "value": "cabb73dd-9145-4be8-8059-9b15309b27c4"
+            },
+            {
+              "name": "status",
+              "value": "open"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "page",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -5840,
+        16
+      ],
+      "id": "2f9fdc80-ec20-42a0-a59f-35e1df038635",
+      "name": "Get Records from contacted Stage--GHL",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "pUFxSNlWAhkPC5KS",
+          "name": "GHL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Robust extractor for contacted names from GHL search response.\n// Handles multiple possible shapes and adds debug info.\n\nconst contactedNames = new Set();\n\nfunction norm(s) {\n  return String(s).toLowerCase().trim().replace(/\\s+/g, \" \");\n}\n\n// Debug counters\nlet totalItems = items.length;\nlet foundDirectName = 0;\nlet foundInOpportunitiesArray = 0;\nlet foundInDataArray = 0;\n\n// 1) Case: items are individual opportunities\nfor (const item of items) {\n  if (item?.json?.name) {\n    contactedNames.add(norm(item.json.name));\n    foundDirectName++;\n  }\n}\n\n// 2) Case: single item contains opportunities: [...]\nfor (const item of items) {\n  const opps = item?.json?.opportunities;\n  if (Array.isArray(opps)) {\n    for (const opp of opps) {\n      if (opp?.name) {\n        contactedNames.add(norm(opp.name));\n        foundInOpportunitiesArray++;\n      }\n    }\n  }\n}\n\n// 3) Case: single item contains data: [...]\nfor (const item of items) {\n  const data = item?.json?.data;\n  if (Array.isArray(data)) {\n    for (const opp of data) {\n      if (opp?.name) {\n        contactedNames.add(norm(opp.name));\n        foundInDataArray++;\n      }\n    }\n  }\n}\n\n// Remove empty strings just in case\ncontactedNames.delete(\"\");\n\nreturn [\n  {\n    json: {\n      contactedNames: Array.from(contactedNames),\n      contactedCount: contactedNames.size\n\n      }\n    }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5616,
+        16
+      ],
+      "id": "13f89609-0521-48f7-be36-4c90c19e15e7",
+      "name": "List of Names"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine first + last name from Heyreach DM record\n// and normalize to match GHL contactedNames format\n\nconst firstName =$('For Each DM').first().json.correspondentProfile.firstName;\n\nconst lastName =$('For Each DM').first().json.correspondentProfile.lastName;\n\n// Combine names\nconst combinedName = `${firstName} ${lastName}`.trim();\n\n// Normalize: lowercase, remove emojis/symbols, normalize spaces\nconst leadNameNormalized = combinedName\n  .toLowerCase()\n  .replace(/[^\\p{L}\\p{N}\\s'.-]/gu, \"\") // keep letters, numbers, space, apostrophe, dot, hyphen\n  .trim()\n  .replace(/\\s+/g, \" \");\n\nreturn [\n  {\n    json: {\n      leadNameNormalized\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3120,
+        -416
+      ],
+      "id": "55140f5d-5e2b-427d-9c8a-ad3ce19729b0",
+      "name": "Normalizing name of Lead"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5978cee2-9e5c-40c1-b2fb-4802fc4ad2b5",
+              "leftValue": "={{ $json.alreadyContacted }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2672,
+        -416
+      ],
+      "id": "12351b36-1734-4755-80fe-f1b51604a4e5",
+      "name": "Call not Booked"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0A9HCF1HU7",
+          "mode": "list",
+          "cachedResultName": "booking-missed"
+        },
+        "text": "=CHECK-- THIS LEAD HAS ALREADY BOOKED THE CALL\n\nBooking Link sent to \"{{ $('Normalizing name of Lead').item.json.leadNameNormalized }}\", and this lead has already booked the call.",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        -2432,
+        -320
+      ],
+      "id": "2bede2a4-759d-4c31-9f8d-49499b86d6b1",
+      "name": "Send a message1",
+      "webhookId": "d3f22690-d298-4d52-906f-adf34672a24c",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "cCQavbyUsbRwtyhV",
+          "name": "Slack account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2224,
+        -320
+      ],
+      "id": "e294ccdd-4efa-4179-b477-5275d050fb68",
+      "name": "Wait2",
+      "webhookId": "3464e48a-d464-496d-985c-7e76abe7efae"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -6064,
+        16
+      ],
+      "id": "e20fe1af-15ca-425e-9c6f-b1cb688c527f",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get normalized lead name\nconst leadName = ($items('Normalizing name of Lead')[0]?.json.leadNameNormalized || '')\n  .trim()\n  .toLowerCase();\n\n// Get contacted names list (single aggregated item)\nconst contactedItem = $items('List of Names')[0]?.json;\n\n// Extract array safely\nconst contactedNames = Array.isArray(contactedItem?.contactedNames)\n  ? contactedItem.contactedNames.map(n => n.trim().toLowerCase())\n  : [];\n\n// Check if name exists\nconst alreadyContacted = contactedNames.includes(leadName);\n\nreturn [\n  {\n    json: {\n      leadName,\n      alreadyContacted,\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2896,
+        -416
+      ],
+      "id": "8894e381-716f-4776-ab0f-6a16d196d168",
+      "name": "Lead Contacted?"
+    },
+    {
+      "parameters": {
+        "resource": "list",
+        "operation": "getLeadsFromList",
+        "listId": 491998,
+        "additionalFields": {
+          "leadProfileUrl": "={{ $json.correspondentProfile.profileUrl }}"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-heyreach.heyReach",
+      "typeVersion": 1,
+      "position": [
+        -4608,
+        32
+      ],
+      "id": "ecfa3396-5ae6-4ac5-ba0e-abeafbd7dfe8",
+      "name": "Retrieve leads from a list",
+      "credentials": {
+        "heyReachApi": {
+          "id": "gqtc6DiuaC0tqgCl",
+          "name": "HeyReach account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a9c0045c-9410-4d28-80ed-4557339de7ac",
+              "leftValue": "={{ $json.totalCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -4400,
+        32
+      ],
+      "id": "6db1628c-8fea-4932-a232-d094dc74299f",
+      "name": "Already sent to Slack"
+    },
+    {
+      "parameters": {
+        "model": "anthropic/claude-3.5-sonnet",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -3728,
+        0
+      ],
+      "id": "0e2dad0e-5c3f-416e-9abb-1995f0d18940",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "Ep3ZUT0sgi8W8MOJ",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0A9HCF1HU7",
+          "mode": "list",
+          "cachedResultName": "booking-missed"
+        },
+        "text": "=🚫 *Booking Not Joined – LinkedIn Lead*\n\n*Name:*  {{ $('For Each DM').item.json.correspondentProfile.firstName }} {{ $('For Each DM').item.json.correspondentProfile.lastName }}\n*LinkedIn:*  {{ $('For Each DM').item.json.correspondentProfile.profileUrl }}\n*Message Thread:* {{ $('Set MessageLink').item.json.messageThreadURL }}\n_Context:_  \nBooking link was sent to the lead, but they did not join or complete the booking.\n",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        -2432,
+        -512
+      ],
+      "id": "bfd124a4-8cf4-4904-b39d-1cdbc40ecbe0",
+      "name": "Send a message",
+      "webhookId": "d3f22690-d298-4d52-906f-adf34672a24c",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "cCQavbyUsbRwtyhV",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "For Each DM": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Retrieve leads from a list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser3": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Check for the Booking Link in the Conversation",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Check for the Booking Link in the Conversation",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set MessageLink": {
+      "main": [
+        [
+          {
+            "node": "Adjust the conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjust the conversation": {
+      "main": [
+        [
+          {
+            "node": "Check for the Booking Link in the Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for the Booking Link in the Conversation": {
+      "main": [
+        [
+          {
+            "node": "if Booking Link Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if Booking Link Sent": {
+      "main": [
+        [
+          {
+            "node": "Normalizing name of Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add leads to a Booking Link Not Sent List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add leads to a Booking Link Sent List": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add leads to a Booking Link Not Sent List": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Conversations": {
+      "main": [
+        [
+          {
+            "node": "Split Out2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out2": {
+      "main": [
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Records from contacted Stage--GHL": {
+      "main": [
+        [
+          {
+            "node": "List of Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List of Names": {
+      "main": [
+        [
+          {
+            "node": "Get All Conversations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizing name of Lead": {
+      "main": [
+        [
+          {
+            "node": "Lead Contacted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call not Booked": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get Records from contacted Stage--GHL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Contacted?": {
+      "main": [
+        [
+          {
+            "node": "Call not Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve leads from a list": {
+      "main": [
+        [
+          {
+            "node": "Already sent to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already sent to Slack": {
+      "main": [
+        [
+          {
+            "node": "Set MessageLink",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "For Each DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Check for the Booking Link in the Conversation",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Add leads to a Booking Link Sent List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Schedule Trigger1": [
+      {
+        "timestamp": "2026-01-22T00:00:49.005-06:00",
+        "Readable date": "January 22nd 2026, 12:00:49 am",
+        "Readable time": "12:00:49 am",
+        "Day of week": "Thursday",
+        "Year": "2026",
+        "Month": "January",
+        "Day of month": "22",
+        "Hour": "00",
+        "Minute": "00",
+        "Second": "49",
+        "Timezone": "America/Chicago (UTC-06:00)"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ecefede2b43cbe1a00e971b8041e14b8e420843726cd23fe9c92442a728c3cde"
+  }
+}
